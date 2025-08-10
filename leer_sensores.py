@@ -1,3 +1,4 @@
+# leer_sensores.py
 import time
 import json
 import board
@@ -20,7 +21,7 @@ class CapacitiveMoistureSensorCalibrado:
         raw = self.chan.value
         humedad = (self.valor_seco - raw) * 100 / (self.valor_seco - self.valor_mojado)
         humedad = max(0, min(100, humedad))
-        return humedad, raw
+        return humedad, raw, self.chan.voltage
 
 class GY30:
     def __init__(self, bus_num=1, addr=0x23):
@@ -40,24 +41,24 @@ def cargar_calibracion():
         datos = json.load(f)
     return datos["valor_seco"], datos["valor_mojado"]
 
-def main():
+def iniciar_sensores():
     valor_seco, valor_mojado = cargar_calibracion()
     sensor_humedad = CapacitiveMoistureSensorCalibrado(ADS.P0, valor_seco, valor_mojado)
     sensor_luz = GY30()
+    return sensor_humedad, sensor_luz
 
-    print("Leyendo humedad y luz...\nPresiona Ctrl+C para salir.\n")
-    try:
-        while True:
-            humedad, raw = sensor_humedad.leer_humedad()
-            voltaje = sensor_humedad.chan.voltage
-            luz = sensor_luz.leer_luz()
-            print(f"Humedad suelo (% capacitive moisture sensor): {humedad:.1f}% | "
-                  f"Valor crudo (ADC ADS1115): {raw} | "
-                  f"Voltaje (ADC ADS1115): {voltaje:.2f} V | "
-                  f"Luz (sensor GY-30 BH1750): {luz:.1f} lux")
-            time.sleep(5)
-    except KeyboardInterrupt:
-        print("\nLectura terminada.")
+def leer_todos_sensores(sensor_humedad, sensor_luz):
+    humedad, raw, voltaje = sensor_humedad.leer_humedad()
+    luz = sensor_luz.leer_luz()
+    return humedad, raw, voltaje, luz
 
 if __name__ == "__main__":
-    main()
+    sensor_humedad, sensor_luz = iniciar_sensores()
+    print("Leyendo sensores (Ctrl+C para salir)...")
+    try:
+        while True:
+            humedad, raw, voltaje, luz = leer_todos_sensores(sensor_humedad, sensor_luz)
+            print(f"Humedad: {humedad:.1f}% | Luz: {luz:.1f} lux")
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("Fin de lectura")
