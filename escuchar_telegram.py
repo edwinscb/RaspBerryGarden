@@ -44,17 +44,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     else:
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
+import traceback
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Muestra el estado de la Raspberry Pi y servicios."""
+    """Muestra el estado de la Raspberry Pi y servicios con depuración."""
+    logger.info(f"Comando /status recibido de chat_id={update.effective_chat.id}")
+
     if str(update.effective_chat.id) != CHAT_ID_AUTORIZADO:
+        logger.warning("Usuario no autorizado intentando usar /status")
         await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
         return
 
     try:
+        logger.info("Obteniendo uso de CPU y RAM...")
         cpu_percent = psutil.cpu_percent()
         ram = psutil.virtual_memory()
+        logger.info(f"CPU: {cpu_percent}%, RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)")
 
-        # Comando para servicios
         cmd = [
             "/usr/bin/systemctl", "status",
             "telegram-notification.service",
@@ -63,24 +69,28 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "raspberry-monitor.service",
             "--no-pager"
         ]
+        logger.info(f"Ejecutando comando: {' '.join(cmd)}")
 
         try:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=5  # máximo 5 segundos
+                timeout=5
             )
+            logger.info("Comando ejecutado correctamente")
             services_status = escape_markdown(result.stdout)
         except subprocess.TimeoutExpired:
+            logger.warning("Timeout al consultar estado de servicios")
             services_status = escape_markdown("⚠️ Tiempo de espera excedido al consultar los servicios.")
 
-        # Escapar valores de CPU y RAM
+        # Escapar valores
         cpu_str = escape_markdown(f"{cpu_percent}%")
         ram_percent_str = escape_markdown(f"{ram.percent}%")
         ram_used_str = escape_markdown(f"{ram.used / (1024**2):.2f} MB")
         ram_total_str = escape_markdown(f"{ram.total / (1024**2):.2f} MB")
 
+        logger.info("Preparando mensaje final...")
         message = (
             "*Estado de la Raspberry Pi*\n\n"
             f"CPU: `{cpu_str}`\n"
@@ -89,9 +99,11 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"```\n{services_status}```"
         )
 
+        logger.info("Enviando mensaje al usuario...")
         await update.message.reply_text(message, parse_mode='MarkdownV2')
 
     except Exception as e:
+        logger.error("Error en /status:\n" + traceback.format_exc())
         error_text = escape_markdown(str(e))
         await update.message.reply_text(f"Ocurrió un error inesperado: {error_text}", parse_mode='MarkdownV2')
 
