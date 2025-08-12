@@ -72,13 +72,19 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 services_status = "⚠️ Tiempo de espera excedido al consultar el estado de los servicios."
 
 
+            cpu_str = escape_markdown(f"{cpu_percent}%")
+            ram_percent_str = escape_markdown(f"{ram.percent}%")
+            ram_used_str = escape_markdown(f"{ram.used / (1024**2):.2f} MB")
+            ram_total_str = escape_markdown(f"{ram.total / (1024**2):.2f} MB")
+
             message = (
-                f"*Estado de la Raspberry Pi*\n\n"
-                f"CPU: `{cpu_percent}%`\n"
-                f"RAM: `{ram.percent}%` (`{ram.used / (1024**2):.2f} MB` de `{ram.total / (1024**2):.2f} MB`)\n\n"
-                f"*Estado de los Servicios*\n"
+                "*Estado de la Raspberry Pi*\n\n"
+                f"CPU: `{cpu_str}`\n"
+                f"RAM: `{ram_percent_str}` (`{ram_used_str}` de `{ram_total_str}`)\n\n"
+                "*Estado de los Servicios*\n"
                 f"```\n{services_status}```"
             )
+
             await update.message.reply_text(message, parse_mode='MarkdownV2')
 
         except Exception as e:
