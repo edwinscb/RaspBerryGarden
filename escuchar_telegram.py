@@ -59,8 +59,18 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "raspberry-monitor.service",
                 "--no-pager"
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            services_status = escape_markdown(result.stdout)
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=5  # máximo 5 segundos
+                )
+                services_status = escape_markdown(result.stdout)
+
+            except subprocess.TimeoutExpired:
+                services_status = "⚠️ Tiempo de espera excedido al consultar el estado de los servicios."
+
 
             message = (
                 f"*Estado de la Raspberry Pi*\n\n"
