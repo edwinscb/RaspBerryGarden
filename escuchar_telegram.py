@@ -16,11 +16,6 @@ logger = logging.getLogger(__name__)
 TOKEN = "8117967778:AAERGuCoPy95XeMviSnZ1Jd_rSmW_j5wk5Q"
 CHAT_ID_AUTORIZADO = "6119961807"
 
-def escape_markdown(text: str) -> str:
-    """Escapa caracteres especiales para MarkdownV2."""
-    special_chars = r'_*[]()~`>#+-=|{}.!'
-    return ''.join(f'\\{c}' if c in special_chars else c for c in text)
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Comando /start: inicia la conversación si el usuario está autorizado."""
     if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
@@ -45,7 +40,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Muestra el estado de la Raspberry Pi y servicios con formato bonito y seguro."""
+    """Muestra el estado de la Raspberry Pi y servicios de forma resumida y segura."""
     logger.info(f"Comando /status recibido de chat_id={update.effective_chat.id}")
 
     if str(update.effective_chat.id) != CHAT_ID_AUTORIZADO:
@@ -54,49 +49,54 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     try:
-        logger.info("Obteniendo uso de CPU y RAM...")
+        # Estado general
         cpu_percent = psutil.cpu_percent()
         ram = psutil.virtual_memory()
 
-        logger.info(f"CPU: {cpu_percent}%, RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)")
-
-        cmd = [
-            "/usr/bin/systemctl", "status",
+        # Lista de servicios a consultar
+        servicios = [
             "telegram-notification.service",
             "telegram-bot-listener.service",
             "guardar_datos.service",
-            "raspberry-monitor.service",
-            "--no-pager"
+            "raspberry-monitor.service"
         ]
 
-        logger.info(f"Ejecutando comando: {' '.join(cmd)}")
+        estado_servicios = []
+        for servicio in servicios:
+            # Verificar si está activo
+            activo = subprocess.run(
+                ["systemctl", "is-active", servicio],
+                capture_output=True, text=True
+            ).stdout.strip()
 
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            logger.info("Comando ejecutado correctamente")
-            services_status = result.stdout
-        except subprocess.TimeoutExpired:
-            logger.warning("Timeout al consultar estado de servicios")
-            services_status = "⚠️ Tiempo de espera excedido al consultar los servicios."
+            # Obtener uso de CPU en nanosegundos
+            cpu_nanos = subprocess.run(
+                ["systemctl", "show", servicio, "--property=CPUUsageNSec"],
+                capture_output=True, text=True
+            ).stdout.strip()
 
-        # Construimos mensaje con formato visual
+            # Extraer número y convertir a segundos
+            try:
+                nanos = int(cpu_nanos.split("=")[1])
+                cpu_seg = nanos / 1_000_000_000  # nanos → segundos
+            except (IndexError, ValueError):
+                cpu_seg = 0.0
+
+            icono = "✅" if activo == "active" else "⚠️"
+            estado_servicios.append(f"{icono} {servicio} — {cpu_seg:.1f}s CPU")
+
+        # Mensaje final
         raw_message = (
             f"📊 Estado de la Raspberry Pi\n"
             f"• CPU: {cpu_percent}%\n"
             f"• RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
-            f"🛠 Estado de los Servicios:\n"
-            f"```\n{services_status}\n```"
+            f"🛠 Servicios:\n" +
+            "\n".join(estado_servicios)
         )
 
-        # Escapar mensaje completo
+        # Escapar para MarkdownV2
         safe_message = escape_markdown(raw_message)
 
-        logger.info("Enviando mensaje al usuario...")
         await update.message.reply_text(safe_message, parse_mode='MarkdownV2')
 
     except Exception as e:
