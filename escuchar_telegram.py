@@ -45,7 +45,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Muestra el estado de la Raspberry Pi y servicios escapando todo el mensaje."""
+    """Muestra el estado de la Raspberry Pi y servicios con formato bonito y seguro."""
     logger.info(f"Comando /status recibido de chat_id={update.effective_chat.id}")
 
     if str(update.effective_chat.id) != CHAT_ID_AUTORIZADO:
@@ -84,16 +84,16 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.warning("Timeout al consultar estado de servicios")
             services_status = "⚠️ Tiempo de espera excedido al consultar los servicios."
 
-        # Construimos mensaje en texto plano
+        # Construimos mensaje con formato visual
         raw_message = (
-            f"Estado de la Raspberry Pi\n\n"
-            f"CPU: {cpu_percent}%\n"
-            f"RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
-            f"Estado de los Servicios\n"
-            f"{services_status}"
+            f"📊 Estado de la Raspberry Pi\n"
+            f"• CPU: {cpu_percent}%\n"
+            f"• RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
+            f"🛠 Estado de los Servicios:\n"
+            f"```\n{services_status}\n```"
         )
 
-        # Escapar TODO el mensaje de golpe
+        # Escapar mensaje completo
         safe_message = escape_markdown(raw_message)
 
         logger.info("Enviando mensaje al usuario...")
