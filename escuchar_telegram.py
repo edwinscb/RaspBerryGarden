@@ -29,6 +29,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info(f"Comando /start ignorado de un usuario no autorizado: {update.effective_chat.id}")
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja el comando /help y lista los comandos disponibles."""
+    if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
+        comandos_disponibles = [
+            "/start - Inicia una conversación con el bot.",
+            "/help - Muestra los comandos disponibles.",
+            "/status - Muestra el estado de la Raspberry Pi y sus servicios."
+        ]
+        
+        mensaje = "Comandos disponibles:\n" + "\n".join(comandos_disponibles)
+        await update.message.reply_text(mensaje)
+    else:
+        await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
+
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /status y muestra el estado del sistema."""
     if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
@@ -59,6 +73,7 @@ def main() -> None:
     # Enlaza el manejador para el comando 'start'.
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status_command))
+    application.add_handler(CommandHandler("help", help_command))
 
     # Inicia el bot para escuchar mensajes.
     application.run_polling(allowed_updates=Update.ALL_TYPES)
