@@ -17,6 +17,10 @@ TOKEN = "8117967778:AAERGuCoPy95XeMviSnZ1Jd_rSmW_j5wk5Q"
 # Define el CHAT_ID del usuario autorizado
 CHAT_ID_AUTORIZADO = "6119961807"
 
+def escape_markdown(text):
+    special_chars = r'_*[]()~`>#+-=|{}.!'
+    return ''.join(f'\\{c}' if c in special_chars else c for c in text)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /start solo si el usuario está autorizado."""
     # Verificamos si el CHAT_ID del mensaje es el autorizado
@@ -43,6 +47,43 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(mensaje)
     else:
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja el comando /status y muestra el estado del sistema."""
+    if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
+        try:
+            cpu_percent = psutil.cpu_percent()
+            ram = psutil.virtual_memory()
+
+            services_status_command = [
+                "/usr/bin/systemctl", "status",
+                "telegram-notification.service",
+                "telegram-bot-listener.service",
+                "guardar_datos.service",
+                "raspberry-monitor.service",
+                "--no-pager"
+            ]
+            
+            result = subprocess.run(services_status_command, capture_output=True, text=True)
+            
+            # Escapa los caracteres especiales de la salida del comando antes de usarlo en el mensaje.
+            services_status = escape_markdown(result.stdout)
+            
+            message = (
+                f"**Estado de la Raspberry Pi**\n\n"
+                f"CPU: `{cpu_percent}%`\n"
+                f"RAM: `{ram.percent}%` (`{ram.used / (1024**2):.2f} MB` de `{ram.total / (1024**2):.2f} MB`)\n\n"
+                f"**Estado de los Servicios**\n"
+                f"```\n{services_status}```"
+            )
+
+            await update.message.reply_text(message, parse_mode='MarkdownV2')
+
+        except Exception as e:
+            await update.message.reply_text(f"Ocurrió un error inesperado: {e}")
+            
+    else:
+        await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /status y muestra el estado del sistema."""
