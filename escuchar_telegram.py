@@ -52,9 +52,10 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             cpu_percent = psutil.cpu_percent()
             ram = psutil.virtual_memory()
 
-            # Obtener el estado de los servicios con subprocess y capturar errores
+            # Obtener el estado de los servicios con subprocess.run
+            # Eliminamos `check=True` para que no falle si algún servicio no está activo.
             services_status_command = [
-                "systemctl", "status",
+                "/usr/bin/systemctl", "status",
                 "telegram-notification.service",
                 "telegram-bot-listener.service",
                 "guardar_datos.service",
@@ -62,7 +63,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 "--no-pager"
             ]
             
-            result = subprocess.run(services_status_command, capture_output=True, text=True, check=True)
+            result = subprocess.run(services_status_command, capture_output=True, text=True)
             services_status = result.stdout
             
             # Formatear el mensaje
@@ -76,8 +77,6 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
             await update.message.reply_text(message, parse_mode='MarkdownV2')
 
-        except subprocess.CalledProcessError as e:
-            await update.message.reply_text(f"Error al ejecutar el comando: {e.stderr}")
         except Exception as e:
             await update.message.reply_text(f"Ocurrió un error inesperado: {e}")
             
