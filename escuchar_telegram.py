@@ -45,52 +45,55 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Comando /status: muestra estado de CPU, RAM y servicios."""
-    if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
-        try:
-            cpu_percent = psutil.cpu_percent()
-            ram = psutil.virtual_memory()
-
-            cmd = [
-                "/usr/bin/systemctl", "status",
-                "telegram-notification.service",
-                "telegram-bot-listener.service",
-                "guardar_datos.service",
-                "raspberry-monitor.service",
-                "--no-pager"
-            ]
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=5  # máximo 5 segundos
-                )
-                services_status = escape_markdown(result.stdout)
-
-            except subprocess.TimeoutExpired:
-                services_status = "⚠️ Tiempo de espera excedido al consultar el estado de los servicios."
-
-
-            cpu_str = escape_markdown(f"{cpu_percent}%")
-            ram_percent_str = escape_markdown(f"{ram.percent}%")
-            ram_used_str = escape_markdown(f"{ram.used / (1024**2):.2f} MB")
-            ram_total_str = escape_markdown(f"{ram.total / (1024**2):.2f} MB")
-
-            message = (
-                "*Estado de la Raspberry Pi*\n\n"
-                f"CPU: `{cpu_str}`\n"
-                f"RAM: `{ram_percent_str}` (`{ram_used_str}` de `{ram_total_str}`)\n\n"
-                "*Estado de los Servicios*\n"
-                f"```\n{services_status}```"
-            )
-
-            await update.message.reply_text(message, parse_mode='MarkdownV2')
-
-        except Exception as e:
-            await update.message.reply_text(f"Ocurrió un error inesperado: {escape_markdown(str(e))}", parse_mode='MarkdownV2')
-    else:
+    """Muestra el estado de la Raspberry Pi y servicios."""
+    if str(update.effective_chat.id) != CHAT_ID_AUTORIZADO:
         await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
+        return
+
+    try:
+        cpu_percent = psutil.cpu_percent()
+        ram = psutil.virtual_memory()
+
+        # Comando para servicios
+        cmd = [
+            "/usr/bin/systemctl", "status",
+            "telegram-notification.service",
+            "telegram-bot-listener.service",
+            "guardar_datos.service",
+            "raspberry-monitor.service",
+            "--no-pager"
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=5  # máximo 5 segundos
+            )
+            services_status = escape_markdown(result.stdout)
+        except subprocess.TimeoutExpired:
+            services_status = escape_markdown("⚠️ Tiempo de espera excedido al consultar los servicios.")
+
+        # Escapar valores de CPU y RAM
+        cpu_str = escape_markdown(f"{cpu_percent}%")
+        ram_percent_str = escape_markdown(f"{ram.percent}%")
+        ram_used_str = escape_markdown(f"{ram.used / (1024**2):.2f} MB")
+        ram_total_str = escape_markdown(f"{ram.total / (1024**2):.2f} MB")
+
+        message = (
+            "*Estado de la Raspberry Pi*\n\n"
+            f"CPU: `{cpu_str}`\n"
+            f"RAM: `{ram_percent_str}` (`{ram_used_str}` de `{ram_total_str}`)\n\n"
+            "*Estado de los Servicios*\n"
+            f"```\n{services_status}```"
+        )
+
+        await update.message.reply_text(message, parse_mode='MarkdownV2')
+
+    except Exception as e:
+        error_text = escape_markdown(str(e))
+        await update.message.reply_text(f"Ocurrió un error inesperado: {error_text}", parse_mode='MarkdownV2')
 
 def main() -> None:
     """Inicia el bot de Telegram."""
