@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 TOKEN = "8117967778:AAERGuCoPy95XeMviSnZ1Jd_rSmW_j5wk5Q"
 CHAT_ID_AUTORIZADO = "6119961807"
 
+def escape_markdown(text: str) -> str:
+    """Escapa caracteres especiales para MarkdownV2."""
+    special_chars = r'_*[]()~`>#+-=|{}.!'
+    return ''.join(f'\\{c}' if c in special_chars else c for c in text)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Comando /start: inicia la conversación si el usuario está autorizado."""
     if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
