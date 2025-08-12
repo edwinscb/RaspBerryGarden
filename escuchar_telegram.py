@@ -10,29 +10,30 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-# Reemplaza 'TU_TOKEN_DE_BOT' con el token que te dio BotFather
 TOKEN = "8117967778:AAERGuCoPy95XeMviSnZ1Jd_rSmW_j5wk5Q"
+# Define el CHAT_ID del usuario autorizado
+CHAT_ID_AUTORIZADO = "6119961807"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Envía un mensaje cuando se emite el comando /start."""
-    user = update.effective_user
-    await update.message.reply_html(
-        f"Hola {user.mention_html()}! Estoy escuchando.",
-        # El comando 'start' es para empezar una conversación con el bot.
-    )
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Envía un mensaje cuando se emite el comando /help."""
-    await update.message.reply_text("Usa /start para iniciar el bot.")
+    """Maneja el comando /start solo si el usuario está autorizado."""
+    # Verificamos si el CHAT_ID del mensaje es el autorizado
+    if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
+        user = update.effective_user
+        await update.message.reply_html(
+            f"Hola {user.mention_html()}! Estoy escuchando tus comandos."
+        )
+    else:
+        # Opcional: Ignoramos o enviamos un mensaje de no autorización
+        logger.info(f"Comando /start ignorado de un usuario no autorizado: {update.effective_chat.id}")
+        await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
 def main() -> None:
     """Inicia el bot."""
     # Crea la aplicación y pásale el token de tu bot.
     application = Application.builder().token(TOKEN).build()
 
-    # Enlaza los manejadores para los comandos 'start' y 'help'.
+    # Enlaza el manejador para el comando 'start'.
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
 
     # Inicia el bot para escuchar mensajes.
     application.run_polling(allowed_updates=Update.ALL_TYPES)
