@@ -2,6 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import os
+import subprocess
 import psutil
 
 # Habilita el registro para ver lo que hace tu bot.
@@ -22,7 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
         user = update.effective_user
         await update.message.reply_html(
-            f"Hola {user.mention_html()}! Estoy escuchando tus comandos."
+            f"Hola {user.mention_html()}! Estoy escuchando tus comandos.Usar /help para ver los comandos disponibles."
         )
     else:
         # Opcional: Ignoramos o enviamos un mensaje de no autorización
@@ -46,22 +47,40 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Maneja el comando /status y muestra el estado del sistema."""
     if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
-        # Obtener información del sistema
-        cpu_percent = psutil.cpu_percent()
-        ram = psutil.virtual_memory()
-        
-        # Obtener el estado de los servicios que has creado
-        services_status_command = "systemctl status telegram-notification.service telegram-bot-listener.service guardar_datos.service raspberry-monitor.service --no-pager"
-        services_status = os.popen(services_status_command).read()
-        
-        # Formatear el mensaje
-        message = f"**Estado de la Raspberry Pi**\n\n"
-        message += f"CPU: {cpu_percent}%\n"
-        message += f"RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
-        message += f"**Estado de los Servicios**\n"
-        message += f"```\n{services_status}```"
+        try:
+            # Obtener información del sistema con psutil
+            cpu_percent = psutil.cpu_percent()
+            ram = psutil.virtual_memory()
 
-        await update.message.reply_text(message, parse_mode='MarkdownV2')
+            # Obtener el estado de los servicios con subprocess y capturar errores
+            services_status_command = [
+                "systemctl", "status",
+                "telegram-notification.service",
+                "telegram-bot-listener.service",
+                "guardar_datos.service",
+                "raspberry-monitor.service",
+                "--no-pager"
+            ]
+            
+            result = subprocess.run(services_status_command, capture_output=True, text=True, check=True)
+            services_status = result.stdout
+            
+            # Formatear el mensaje
+            message = (
+                f"**Estado de la Raspberry Pi**\n\n"
+                f"CPU: `{cpu_percent}%`\n"
+                f"RAM: `{ram.percent}%` (`{ram.used / (1024**2):.2f} MB` de `{ram.total / (1024**2):.2f} MB`)\n\n"
+                f"**Estado de los Servicios**\n"
+                f"```\n{services_status}```"
+            )
+
+            await update.message.reply_text(message, parse_mode='MarkdownV2')
+
+        except subprocess.CalledProcessError as e:
+            await update.message.reply_text(f"Error al ejecutar el comando: {e.stderr}")
+        except Exception as e:
+            await update.message.reply_text(f"Ocurrió un error inesperado: {e}")
+            
     else:
         await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
 
