@@ -1,6 +1,8 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+import os
+import psutil
 
 # Habilita el registro para ver lo que hace tu bot.
 logging.basicConfig(
@@ -27,6 +29,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.info(f"Comando /start ignorado de un usuario no autorizado: {update.effective_chat.id}")
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja el comando /status y muestra el estado del sistema."""
+    if str(update.effective_chat.id) == CHAT_ID_AUTORIZADO:
+        # Obtener información del sistema
+        cpu_percent = psutil.cpu_percent()
+        ram = psutil.virtual_memory()
+        
+        # Obtener el estado de los servicios que has creado
+        services_status_command = "systemctl status telegram-notification.service telegram-bot-listener.service guardar_datos.service raspberry-monitor.service --no-pager"
+        services_status = os.popen(services_status_command).read()
+        
+        # Formatear el mensaje
+        message = f"**Estado de la Raspberry Pi**\n\n"
+        message += f"CPU: {cpu_percent}%\n"
+        message += f"RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
+        message += f"**Estado de los Servicios**\n"
+        message += f"```\n{services_status}```"
+
+        await update.message.reply_text(message, parse_mode='MarkdownV2')
+    else:
+        await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
+
 def main() -> None:
     """Inicia el bot."""
     # Crea la aplicación y pásale el token de tu bot.
@@ -34,6 +58,7 @@ def main() -> None:
 
     # Enlaza el manejador para el comando 'start'.
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("status", status_command))
 
     # Inicia el bot para escuchar mensajes.
     application.run_polling(allowed_updates=Update.ALL_TYPES)
