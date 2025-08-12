@@ -3,6 +3,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import subprocess
 import psutil
+import shutil
 
 # Configuración de logging
 logging.basicConfig(
@@ -45,7 +46,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Lo siento, no estás autorizado para usar este bot.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Muestra el estado de la Raspberry Pi y servicios de forma resumida y segura."""
+    """Muestra estado de CPU, RAM, almacenamiento y servicios resumido."""
     logger.info(f"Comando /status recibido de chat_id={update.effective_chat.id}")
 
     if str(update.effective_chat.id) != CHAT_ID_AUTORIZADO:
@@ -54,52 +55,55 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     try:
-        # Estado general
+        # Estado general CPU y RAM
         cpu_percent = psutil.cpu_percent()
         ram = psutil.virtual_memory()
 
-        # Lista de servicios a consultar
+        # Estado de almacenamiento
+        total_disk, used_disk, free_disk = shutil.disk_usage("/")
+        disk_percent = used_disk / total_disk * 100
+
+        # Lista de servicios
         servicios = [
             "telegram-notification.service",
             "telegram-bot-listener.service",
             "guardar_datos.service",
             "raspberry-monitor.service"
         ]
-
         estado_servicios = []
         for servicio in servicios:
-            # Verificar si está activo
+            # Estado activo/inactivo
             activo = subprocess.run(
                 ["systemctl", "is-active", servicio],
                 capture_output=True, text=True
             ).stdout.strip()
 
-            # Obtener uso de CPU en nanosegundos
+            # CPU consumida
             cpu_nanos = subprocess.run(
                 ["systemctl", "show", servicio, "--property=CPUUsageNSec"],
                 capture_output=True, text=True
             ).stdout.strip()
 
-            # Extraer número y convertir a segundos
             try:
                 nanos = int(cpu_nanos.split("=")[1])
-                cpu_seg = nanos / 1_000_000_000  # nanos → segundos
+                cpu_seg = nanos / 1_000_000_000
             except (IndexError, ValueError):
                 cpu_seg = 0.0
 
             icono = "✅" if activo == "active" else "⚠️"
             estado_servicios.append(f"{icono} {servicio} — {cpu_seg:.1f}s CPU")
 
-        # Mensaje final
+        # Construcción del mensaje
         raw_message = (
             f"📊 Estado de la Raspberry Pi\n"
             f"• CPU: {cpu_percent}%\n"
-            f"• RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n\n"
+            f"• RAM: {ram.percent}% ({ram.used / (1024**2):.2f} MB de {ram.total / (1024**2):.2f} MB)\n"
+            f"💾 Almacenamiento: {disk_percent:.1f}% ({used_disk / (1024**3):.2f} GB de {total_disk / (1024**3):.2f} GB)\n\n"
             f"🛠 Servicios:\n" +
             "\n".join(estado_servicios)
         )
 
-        # Escapar para MarkdownV2
+        # Escapar todo
         safe_message = escape_markdown(raw_message)
 
         await update.message.reply_text(safe_message, parse_mode='MarkdownV2')
