@@ -10,7 +10,8 @@ async def command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         comandos_disponibles = [
             "/start - Inicia una conversación con el bot.",
             "/help - Muestra los comandos disponibles.",
-            "/status - Muestra el estado de la Raspberry Pi y sus servicios."
+            "/status - Muestra el estado de la Raspberry Pi y sus servicios.",
+            "/reboot - Reinicia la Raspberry Pi (requiere confirmación).",
         ]
         await update.message.reply_text("Comandos disponibles:\n" + "\n".join(comandos_disponibles))
     else:
