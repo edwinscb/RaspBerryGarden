@@ -18,6 +18,10 @@ def load_commands(application):
             if hasattr(module, "COMMAND_NAME") and hasattr(module, "command"):
                 application.add_handler(CommandHandler(module.COMMAND_NAME, module.command))
                 print(f"✅ Comando /{module.COMMAND_NAME} cargado")
+
+                if hasattr(module, "button_handler"):
+                    application.add_handler(CallbackQueryHandler(module.button_handler))
+                    print(f"🔘 Botones para /{module.COMMAND_NAME} registrados")
             else:
                 print(f"⚠️ {file} no tiene COMMAND_NAME o command()")
 
