@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from config import TOKEN
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE_DIR) 
+sys.path.insert(0, BASE_DIR)
 COMMANDS_DIR = os.path.join(BASE_DIR, "commands")
 
 def load_commands(application):
@@ -19,9 +19,11 @@ def load_commands(application):
                 application.add_handler(CommandHandler(module.COMMAND_NAME, module.command))
                 print(f"✅ Comando /{module.COMMAND_NAME} cargado")
 
+                # Si el módulo tiene botón (como reboot), también lo agregamos
                 if hasattr(module, "button_handler"):
                     application.add_handler(CallbackQueryHandler(module.button_handler))
-                    print(f"🔘 Botones para /{module.COMMAND_NAME} registrados")
+                    print(f"🔘 Botones de /{module.COMMAND_NAME} cargados")
+
             else:
                 print(f"⚠️ {file} no tiene COMMAND_NAME o command()")
 
