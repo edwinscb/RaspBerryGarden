@@ -2,7 +2,7 @@ import os
 import sys
 import importlib
 from telegram import Update
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from config import TOKEN
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
