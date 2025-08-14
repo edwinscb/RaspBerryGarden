@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes
 from config import CHAT_ID_AUTORIZADO
 from utils import escape_markdown
 
-# Configurar logger para que imprima en consola
+# Configurar logger para consola
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -17,30 +17,33 @@ logger = logging.getLogger(__name__)
 
 COMMAND_NAME = "reboot"
 
-# Estado
+# Estado global
 esperando_confirmacion = False
 task_expiracion = None
 pending_msg_chat_id = None
 pending_msg_message_id = None
 
 async def command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ /reboot: pide confirmación con botones y expira en 30s. """
+    """ /reboot con confirmación y depurado paso a paso """
     global esperando_confirmacion, task_expiracion, pending_msg_chat_id, pending_msg_message_id
 
-    logger.debug("Comando /reboot recibido.")
-    user_id = str(update.effective_user.id)
-    logger.debug(f"Usuario que ejecuta: {user_id}")
+    logger.debug("=== [INICIO] Usuario ejecutó /reboot ===")
+    logger.debug(f"Usuario ID: {update.effective_user.id}")
+    logger.debug(f"Mensaje recibido: {update.message.text if update.message else 'Sin texto'}")
 
-    if user_id != CHAT_ID_AUTORIZADO:
-        logger.warning(f"Usuario NO autorizado: {user_id}")
+    if str(update.effective_user.id) != CHAT_ID_AUTORIZADO:
+        logger.debug("Usuario NO autorizado, enviando respuesta.")
         await update.message.reply_text("Lo siento, no estás autorizado para ejecutar este comando.")
+        logger.debug("=== [FIN] Comando rechazado por usuario no autorizado ===")
         return
 
     if esperando_confirmacion:
-        logger.debug("Ya hay una confirmación pendiente.")
+        logger.debug("Ya hay confirmación pendiente, notificando al usuario.")
         await update.message.reply_text("Ya hay una confirmación pendiente. Usa los botones del mensaje anterior.")
+        logger.debug("=== [FIN] Comando detenido por confirmación previa ===")
         return
 
+    logger.debug("Preparando mensaje de confirmación con botones.")
     esperando_confirmacion = True
 
     keyboard = [[
@@ -50,7 +53,6 @@ async def command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     msg = "⚠️ ¿Seguro que quieres reiniciar la Raspberry Pi?\n⏳ Este diálogo expira en 30 segundos."
-    logger.debug("Enviando mensaje de confirmación con botones.")
     sent = await update.message.reply_text(
         escape_markdown(msg), parse_mode="MarkdownV2", reply_markup=reply_markup
     )
@@ -59,58 +61,65 @@ async def command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     pending_msg_message_id = sent.message_id
     logger.debug(f"Mensaje enviado con ID: {pending_msg_message_id}")
 
+    logger.debug("Creando tarea de expiración de confirmación (30s).")
     task_expiracion = asyncio.create_task(expirar_confirmacion(context))
 
+    logger.debug("=== [FIN] /reboot esperando confirmación ===")
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ Maneja los clicks de los botones ✅/❌ """
+    """ Maneja los botones de confirmación """
     global esperando_confirmacion, task_expiracion
 
+    logger.debug("=== [INICIO] Botón presionado ===")
     query = update.callback_query
     await query.answer()
 
-    user_id = str(query.from_user.id)
-    logger.debug(f"Botón pulsado por usuario {user_id}, data={query.data}")
+    logger.debug(f"Usuario que presionó botón: {query.from_user.id}")
+    logger.debug(f"Callback data recibida: {query.data}")
 
-    if user_id != CHAT_ID_AUTORIZADO or not esperando_confirmacion:
-        logger.debug("Botón ignorado (usuario no autorizado o confirmación expirada).")
+    if str(query.from_user.id) != CHAT_ID_AUTORIZADO or not esperando_confirmacion:
+        logger.debug("Botón ignorado: usuario no autorizado o confirmación expirada.")
+        logger.debug("=== [FIN] Botón ignorado ===")
         return
 
     if task_expiracion:
-        logger.debug("Cancelando temporizador de expiración.")
+        logger.debug("Cancelando tarea de expiración.")
         task_expiracion.cancel()
         task_expiracion = None
 
     esperando_confirmacion = False
 
+    logger.debug("Eliminando botones del mensaje.")
     try:
-        logger.debug("Quitando botones del mensaje.")
         await query.edit_message_reply_markup(reply_markup=None)
     except Exception as e:
-        logger.warning(f"No se pudo quitar el reply_markup: {e}")
+        logger.warning(f"No se pudo eliminar reply_markup: {e}")
 
     if query.data == "reboot_yes":
-        logger.info("Usuario confirmó reinicio.")
+        logger.debug("Usuario confirmó reinicio. Ejecutando 'sudo reboot'.")
         await query.edit_message_text("♻️ Reiniciando la Raspberry Pi...")
         subprocess.run(["sudo", "reboot"], check=False)
     elif query.data == "reboot_no":
-        logger.info("Usuario canceló reinicio.")
+        logger.debug("Usuario canceló reinicio.")
         await query.edit_message_text("❌ Reinicio cancelado.")
 
+    logger.debug("=== [FIN] Botón procesado ===")
+
 async def expirar_confirmacion(context: ContextTypes.DEFAULT_TYPE):
-    """ Expira la confirmación a los 30s, desactivando los botones. """
+    """ Expira la confirmación después de 30s """
     global esperando_confirmacion, pending_msg_chat_id, pending_msg_message_id
+    logger.debug("Iniciando cuenta regresiva de 30s para expiración.")
     try:
-        logger.debug("Esperando 30s para expiración de confirmación.")
         await asyncio.sleep(30)
-        if esperando_confirmacion and pending_msg_chat_id and pending_msg_message_id:
-            logger.info("Tiempo de confirmación agotado.")
+        if esperando_confirmacion:
+            logger.debug("Tiempo agotado, cancelando reinicio.")
             esperando_confirmacion = False
             try:
                 await context.bot.edit_message_reply_markup(
                     chat_id=pending_msg_chat_id, message_id=pending_msg_message_id, reply_markup=None
                 )
             except Exception as e:
-                logger.warning(f"No se pudo quitar reply_markup en expiración: {e}")
+                logger.warning(f"No se pudo quitar botones al expirar: {e}")
 
             try:
                 await context.bot.edit_message_text(
@@ -119,6 +128,6 @@ async def expirar_confirmacion(context: ContextTypes.DEFAULT_TYPE):
                     text="⌛ Tiempo de confirmación agotado. Reinicio cancelado."
                 )
             except Exception as e:
-                logger.warning(f"No se pudo editar mensaje en expiración: {e}")
+                logger.warning(f"No se pudo editar mensaje al expirar: {e}")
     except asyncio.CancelledError:
-        logger.debug("Expiración cancelada porque el usuario pulsó un botón.")
+        logger.debug("Expiración cancelada porque el usuario tomó una decisión.")
