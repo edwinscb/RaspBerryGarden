@@ -9,7 +9,7 @@ COMMAND_NAME = "reboot"
 
 # Estado de confirmación
 esperando_confirmacion = False
-task_expiracion = None  # Para guardar el temporizador
+task_expiracion = None 
 
 async def command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Comando /reboot: pide confirmación con botones."""
