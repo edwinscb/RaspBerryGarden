@@ -1,17 +1,20 @@
 import os
+import sys
 import importlib
 from telegram import Update
 from telegram.ext import Application, CommandHandler
 from config import TOKEN
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR) 
+COMMANDS_DIR = os.path.join(BASE_DIR, "commands")
+
 def load_commands(application):
-    commands_dir = "commands"
-    for file in os.listdir(commands_dir):
+    for file in os.listdir(COMMANDS_DIR):
         if file.endswith("_command.py"):
-            module_name = f"{commands_dir}.{file[:-3]}"
+            module_name = f"commands.{file[:-3]}"
             module = importlib.import_module(module_name)
 
-            # Aseguramos que tenga las variables esperadas
             if hasattr(module, "COMMAND_NAME") and hasattr(module, "command"):
                 application.add_handler(CommandHandler(module.COMMAND_NAME, module.command))
                 print(f"✅ Comando /{module.COMMAND_NAME} cargado")
